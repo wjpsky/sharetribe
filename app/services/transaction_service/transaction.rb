@@ -39,13 +39,22 @@ module TransactionService::Transaction
 
       merchant = PaypalService::MerchantInjector.build_paypal_merchant
       capture_request = PaypalService::DataTypes::Merchant.create_do_full_capture(api_params)
-      capture_response = merchant.do_request(capture_request)
+#       capture_response = merchant.do_request(capture_request)
+
+      capture_response = {:success => true,
+        :authorization_id => "0S356074DX216262L",
+        :payment_id => "00R95745PM4594316",
+        :payment_status => "Pending",
+        :pending_reason => "multi-currency",
+        :payment_total => Money.new(200, "USD"),
+        :fee_total => nil,
+        :payment_date => Time.now}
 
       if capture_response[:success]
-        PaypalService::PaypalPayment::Command.update(paypal_payment.merge(capture_response))
+  #      PaypalService::PaypalPayment::Command.update(paypal_payment.merge(capture_response))
 
         if capture_response[:payment_status] != "completed"
-          transaction = MarketplaceService::Transaction::Command.transition_to(transaction[:id], :pending_ext)
+          transaction = MarketplaceService::Transaction::Command.transition_to(transaction[:id], :pending_ext, {pending_reason: capture_response[:pending_reason]})
           Result::Success.new(
             DataTypes.create_transaction_response(transaction, DataTypes.create_paypal_complete_preauthorization_fields(pending_reason: capture_response[:pending_reason])))
         else

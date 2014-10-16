@@ -114,6 +114,7 @@ module MarketplaceService
     end
 
     module Command
+
       NewTransactionOptions = EntityUtils.define_builder(
         [:community_id, :fixnum, :mandatory],
         [:listing_id, :fixnum, :mandatory],
@@ -178,7 +179,7 @@ module MarketplaceService
           .update_all(is_read: true)
       end
 
-      def transition_to(transaction_id, new_status)
+      def transition_to(transaction_id, new_status, metadata = nil)
         new_status = new_status.to_sym
         transaction = TransactionModel.find(transaction_id)
         old_status = transaction.current_state.to_sym if transaction.current_state.present?
@@ -188,15 +189,15 @@ module MarketplaceService
 
         Events.handle_transition(transaction_entity, payment_type, old_status, new_status)
 
-        Entity.transaction(save_transition(transaction, new_status))
+        Entity.transaction(save_transition(transaction, new_status, metadata))
       end
 
-      def save_transition(transaction, new_status)
+      def save_transition(transaction, new_status, metadata = nil)
         transaction.current_state = new_status
         transaction.save!
 
         state_machine = TransactionProcess.new(transaction, transition_class: TransactionTransition)
-        state_machine.transition_to!(new_status)
+        state_machine.transition_to!(new_status, TransactionService::DataTypes::TransitionMetadata.create_metadata(new_status, metadata))
 
         transaction.touch(:last_transition_at)
 

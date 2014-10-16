@@ -56,6 +56,17 @@ module TransactionHelper
         }
       },
 
+      pending_ext: {
+        author: {
+          icon: icon_waiting_you,
+          text: "TODO"
+        },
+        starter: {
+          icon: icon_waiting_other,
+          text: t("conversations.status.waiting_for_listing_author_to_accept_request", listing_author_name: other_party_name)
+        }
+      },
+
       accepted: {
         author: {
           icon: icon_waiting_other,
@@ -145,6 +156,7 @@ module TransactionHelper
   # }
   def get_conversation_statuses(conversation)
 
+    binding.pry
     statuses = if conversation.listing && !conversation.status.eql?("free")
       case conversation.status
       when "pending"
@@ -166,6 +178,10 @@ module TransactionHelper
         [
           status_info(t("conversations.status.#{conversation.discussion_type}_preauthorized"), icon_classes: icon_for("preauthorized")),
           preauthorized_status(conversation)
+        ]
+      when "pending_ext"
+        [
+          status_info("Pending external reason: " + conversation.transaction_transitions.last.metadata["pending_reason"].to_s)
         ]
       when "confirmed"
         [

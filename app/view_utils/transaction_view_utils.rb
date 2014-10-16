@@ -27,7 +27,7 @@ module TransactionViewUtils
     transitions
       .zip(previous_states)
       .reject { |(transition, previous_state)|
-        ["free", "pending", "initiated"].include? transition[:to_state]
+        ["free", "pending", "initiated", "pending_ext"].include? transition[:to_state]
       }
       .map { |(transition, previous_state)|
         create_message_from_action(transition, previous_state, discussion_type, author, starter, payment_sum)
