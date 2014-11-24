@@ -82,15 +82,19 @@ docker info                              # this should run ok now
 
 1. Load schema (only on the first run)
 
-  `fig run web /bin/bash -l -c "bundle exec rake db:schema:load"`
+  `fig run zeus /bin/bash -l -c "zeus rake db:schema:load"`
 
 1. Create a marketplace (only on the first run)
 
-  `fig run web /bin/bash -l -c 'rails runner "Community.create(name: \"docker\", domain: \"docker\")"'`
+  `fig run zeus /bin/bash -l -c 'zeus runner "Community.create(name: \"docker\", domain: \"docker\")"'`
 
-1. Run the app
+1. Run zeus server
 
   `fig up`
+
+1. Run web server via zeus
+
+  `fig run zeus /bin/bash -l -c 'zeus s'`
 
 1. Set lvh.me to point to docker IP
 

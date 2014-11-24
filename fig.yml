@@ -15,8 +15,6 @@ worker:
     - db:mysql
   volumes:
     - .:/opt/sharetribe
-  environment:
-    RAILS_ENV: development
 
 search:
   build: .
@@ -31,16 +29,15 @@ search:
     RAILS_ENV: development
     SPHINX_HOST: ""
 
-web:
+zeus:
   build: .
-  command: '/bin/bash -l -c "bundle exec rails server"'
+  command: '/bin/bash -l -c "zeus start"'
   volumes:
      - .:/opt/sharetribe
-  ports:
-    - "3000:3000"
   links:
     - db:mysql
     - search:search
   environment:
-    RAILS_ENV: development
     SPHINX_HOST: search
+  ports:
+    - 3000:3000
