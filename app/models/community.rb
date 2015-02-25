@@ -3,6 +3,7 @@
 # Table name: communities
 #
 #  id                                         :integer          not null, primary key
+#  username                                   :string(255)      not null
 #  domain                                     :string(255)
 #  created_at                                 :datetime
 #  updated_at                                 :datetime
@@ -470,9 +471,7 @@ class Community < ActiveRecord::Base
 
   # Find community by domain, which can be full domain or just subdomain
   def self.find_by_domain(domain_string)
-    if domain_string =~ /\:/ #string includes port which should be removed
-      domain_string = domain_string.split(":").first
-    end
+    domain_string = URLUtils.strip_port_from_host(domain_string)
 
     # search for exact match or then match by first part of domain string.
     # first priority is the domain, then domain_alias
