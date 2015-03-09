@@ -246,7 +246,76 @@ class PaypalAccountsController < ApplicationController
   end
 
   def accounts_api
-    PaypalService::API::Api.accounts_api
+    @accounts_api ||= AccountsHTTPApi.new("localhost:4444")
+  end
+
+  class AccountsHTTPApi
+
+    def initialize(host)
+      @host = host
+    end
+
+    def get(community_id:, person_id: nil)
+      http_resp =
+        if person_id.nil?
+          Net::HTTP.get(uri("/accounts/#{community_id}"))
+        else
+          Net::HTTP.get(uri("/accounts/#{community_id}/#{person_id}"))
+        end
+
+      handle_response(http_resp)
+    end
+
+    def request(body:)
+      uri =
+        if body[:person_id].nil?
+          uri("/accounts/request/#{body[:community_id]}")
+        else
+          uri("/accounts/request/#{body[:community_id]}/#{body[:person_id]}")
+        end
+
+      http_resp =
+        Net::HTTP.start(uri.hostname, uri.port) do |http|
+          req = Net::HTTP::Post.new(uri)
+          req.body = body.slice(:callback_url, :country).to_json
+
+          http.request(req)
+        end
+
+      handle_response(http_resp.body)
+    end
+
+    def create(community_id:, person_id: nil, order_permission_request_token:, body:)
+      uri =
+        if person_id.nil?
+          uri("/accounts/create/#{community_id}?order_permission_request_token=#{order_permission_request_token}")
+        else
+          uri("/accounts/create/#{community_id}/#{person_id}?order_permission_request_token=#{order_permission_request_token}")
+        end
+
+      http_resp =
+        Net::HTTP.start(uri.hostname, uri.port) do |http|
+          req = Net::HTTP::Post.new(uri)
+          req.body = body.to_json
+
+          http.request(req)
+        end
+
+      binding.pry
+      handle_response(http_resp.body)
+    end
+
+    def values_to_sym(hash, keys)
+      hash.merge(keys.inject({}) { |memo, key| memo.tap { |m| m[key] = hash[key].to_sym } })
+    end
+
+    def uri(path)
+      URI("http://#{@host}#{path}")
+    end
+
+    def handle_response(resp)
+      Result::Success.new(HashUtils.symbolize_keys(JSON.parse(resp)))
+    end
   end
 
 end
