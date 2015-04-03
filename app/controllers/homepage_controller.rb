@@ -19,17 +19,25 @@ class HomepageController < ApplicationController
 
     @view_type = HomepageController.selected_view_type(params[:view], @current_community.default_browse_view, APP_DEFAULT_VIEW_TYPE, VIEW_TYPES)
 
-    @categories = @current_community.categories
-    @main_categories = @current_community.main_categories
+    # @categories = @current_community.categories
+    # @main_categories = @current_community.main_categories
     all_shapes = shapes.get(community_id: @current_community.id)[:data]
+    category_tree = CategoryViewUtils.embed_shapes(
+      category_tree: categories.get(community_id: @current_community.id)[:data],
+      shapes: all_shapes,
+      locale: I18n.locale,
+      all_locales: @current_community.locales,
+      translation_cache: community_translations)
+
+    binding.pry
 
     # This assumes that we don't never ever have communities with only 1 main share type and
     # only 1 sub share type, as that would make the listing type menu visible and it would look bit silly
-    @transaction_type_menu_enabled = all_shapes.size > 1
-    @show_categories = @current_community.categories.size > 1
+    transaction_type_menu_enabled = all_shapes.size > 1
+    show_categories = CategoryViewUtils.more_than_one?(category_tree)
     filters_enabled = @current_community.custom_fields.size > 0 || @current_community.show_price_filter
-    @show_custom_fields = @current_community.custom_fields.select { |field| field.can_filter? }.present?
-    @category_menu_enabled = @show_categories || @show_custom_fields || filters_enabled
+    show_custom_fields = @current_community.custom_fields.select { |field| field.can_filter? }.present?
+    category_menu_enabled = show_categories || show_custom_fields || filters_enabled
 
     @app_store_badge_filename = "/assets/Available_on_the_App_Store_Badge_en_135x40.svg"
     if File.exists?("app/assets/images/Available_on_the_App_Store_Badge_#{I18n.locale}_135x40.svg")
@@ -38,10 +46,26 @@ class HomepageController < ApplicationController
 
     listings_per_page = APP_CONFIG.grid_listings_limit
 
+    shape_by_name = all_shapes.find { |s| s[:name] == params[:transaction_type] }
+    shape_by_id = all_shapes.find { |s| s[:transaction_type_id] == params[:transaction_type] } unless shape_by_name
+
+    filter_params = {}
+
+    binding.pry
+
+    selected_shape = shape_by_name || shape_by_id
+
+    category_by_name = find_category_by(category_tree) { |c| c[:name] == params[:category] }
+    category_by_id = find_category_by(category_tree) { |c| c[:id] == params[:category] }
+    selected_category = category_by_name || category_by_id
+
+    filter_params[:transaction_type] = selected_shape[:transaction_type_id] if selected_shape
+    filter_params[:category] = selected_category[:id] if selected_category
+
     @listings = if @view_type == "map"
-      find_listings(params, APP_CONFIG.map_listings_limit)
+      find_listings(params, APP_CONFIG.map_listings_limit, filter_params)
     else
-      find_listings(params, listings_per_page)
+      find_listings(params, listings_per_page, filter_params)
     end
 
     if request.xhr? # checks if AJAX request
@@ -51,7 +75,16 @@ class HomepageController < ApplicationController
         render :partial => "list_item", :collection => @listings, :as => :listing
       end
     else
-      render locals: { shapes: all_shapes, selected_shape: @selected_shape }
+      render locals: {
+               shapes: all_shapes,
+               selected_shape: selected_shape,
+               category_menu_enabled: category_menu_enabled,
+               category_tree: CategoryViewUtils.mark_open_categories(category_tree, selected_category[:id]),
+               selected_category: selected_category,
+               transaction_type_menu_enabled: transaction_type_menu_enabled,
+               show_categories: show_categories,
+               show_custom_fields: show_custom_fields
+             }
     end
   end
 
@@ -67,27 +100,27 @@ class HomepageController < ApplicationController
 
   private
 
-  def find_listings(params, listings_per_page)
+  def find_category_by(categories, &block)
+    categories.reduce(nil) { |hit, category|
+      if hit
+        hit
+      else
+        if block.call(category)
+          category
+        elsif category[:children].present?
+          find_category_by_name(category[:children], &block)
+        else
+          nil
+        end
+      end
+    }
+  end
+
+  def find_listings(params, listings_per_page, filter_params = {})
     # :share_type was renamed to :transaction_type
     # Support both URLs for a while
     # This can be removeds soon (June 2014)
     params[:transaction_type] ||= params[:share_type]
-
-    filter_params = {}
-
-    Maybe(@current_community.categories.find_by_url_or_id(params[:category])).each do |category|
-      filter_params[:category] = category.id
-      @selected_category = category
-    end
-
-    all_shapes = shapes.get(community_id: @current_community.id)[:data]
-    shape_by_name = all_shapes.find { |s| s[:name] == params[:transaction_type] }
-    shape_by_id = all_shapes.find { |s| s[:transaction_type_id] == params[:transaction_type] } unless shape_by_name
-
-    Maybe(shape_by_name || shape_by_id).each do |shape|
-      filter_params[:transaction_type] = shape[:transaction_type_id]
-      @selected_shape = shape
-    end
 
     @listing_count = @current_community.listings.currently_open.count
     unless @current_user
@@ -185,7 +218,15 @@ class HomepageController < ApplicationController
     options_from_params(params, /^checkbox_filter_option/).flatten
   end
 
+  def listing_api
+    ListingService::API::Api
+  end
+
   def shapes
-    ListingService::API::Api.shapes
+    listing_api.shapes
+  end
+
+  def categories
+    listing_api.categories
   end
 end

@@ -28,14 +28,15 @@ module CategoryViewUtils
   #     "id" => "id"
   #   }
   # ]
-  def category_tree(categories: categories, shapes: shapes, locale:, all_locales:, translation_cache:)
-    categories.map { |c|
+  def embed_shapes(category_tree:, shapes:, locale:, all_locales:, translation_cache:)
+    category_tree.map { |c|
       {
         id: c[:id],
         label: pick_category_translation(c[:translations], locale, all_locales),
+        name: c[:name],
         transaction_types: embed_shape(c[:listing_shape_ids], shapes, locale, all_locales, translation_cache),
-        subcategories: category_tree(
-          categories: c[:children],
+        subcategories: embed_shapes(
+          category_tree: c[:children],
           shapes: shapes,
           locale: locale,
           all_locales: all_locales,
@@ -46,7 +47,21 @@ module CategoryViewUtils
 
   end
 
+  def mark_open_categories(categories, selected_category_id)
+    categories.map { |c|
+      c.merge(open: open?(c, selected_category_id))
+    }
+  end
+
+  def more_than_one?(categories)
+    categories.size > 1 || categories.first[:children].size > 1
+  end
+
   # private
+
+  def open?(category, selected_category_id)
+    category[:id] == selected_category_id || category[:subcategories].any? { |child| child[:id] == selected_category_id }
+  end
 
   def embed_shape(ids, shapes, locale, all_locales, translation_cache)
     shapes.select { |s|
