@@ -150,6 +150,8 @@ module EntityUtils
       :validators
     elsif (TRANSFORMERS.keys.include?(k))
       :transformers
+    elsif k == :nested
+      :nested
     else
       raise(ArgumentError, "Illegal key #{k}. Not a known transformer or validator.")
     end
@@ -169,6 +171,8 @@ module EntityUtils
     parsed_spec[:transformers] =
       (parsed_spec[:transformers] || [])
       .map { |(name, param)| TRANSFORMERS[name].curry().call(param) }
+    parsed_spec[:nested] =
+      (opts[:nested] || [])
 
     parsed_spec
   end
@@ -189,21 +193,49 @@ module EntityUtils
     end
   end
 
+  def validate_all(fields, output)
+    fields.reduce([]) do |errs, (name, spec)|
+      errors = validate(spec[:validators], output[name], name)
+      nested_errors =
+        if spec[:nested].empty?
+          []
+        else
+          if output[name]
+            output[name].map { |out| validate_all(parse_specs(spec[:nested]), out) }.reject { |e| e.empty? }
+          else
+            []
+          end
+        end
+
+      errs.concat(errors.concat(nested_errors))
+    end
+  end
+
   def transform(transformers, val)
     transformers.reduce(val) do |v, transformer|
       transformer.call(v)
     end
   end
 
-  def transform_and_validate(fields, input)
-    output = fields.reduce({}) do |out, (name, spec)|
-      out[name] = transform(spec[:transformers], input[name])
+  def transform_all(fields, input)
+    fields.reduce({}) do |out, (name, spec)|
+      out[name] =
+        if spec[:nested].empty?
+          transform(spec[:transformers], input[name])
+        else
+          if input[name]
+            input[name].map { |inp| transform_all(parse_specs(spec[:nested]), inp) }
+          else
+            []
+          end
+        end
       out
     end
+  end
 
-    errors = fields.reduce([]) do |errs, (name, spec)|
-      errs.concat(validate(spec[:validators], output[name], name))
-    end
+  def transform_and_validate(fields, input)
+    output = transform_all(fields, input)
+    errors = validate_all(fields, output)
 
     {value: output, errors: errors}
   end

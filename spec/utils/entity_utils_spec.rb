@@ -54,6 +54,52 @@ describe EntityUtils do
         .to raise_error
   end
 
+  it "#define_builder can nest" do
+    Player = EntityUtils.define_builder(
+      [:hand, validate_with: ->(hand) { hand.size == 5 }, nested: [
+         [:suit, one_of: [:spades, :hearts, :diamonds, :clubs]],
+         [:value, one_of: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]]],
+      ],
+      [:chips, :mandatory, nested: [
+         [:value, :fixnum, :optional]]])
+
+    expect{Player.call({
+                         name: "mikko",
+                         hand: [
+                           {suit: :spades, value: 10},
+                           {suit: :spades, value: 14},
+                           {suit: :hearts, value: 8},
+                           {suit: :hearts, value: 9},
+                           {suit: :clubs, value: 12}
+                         ],
+                         chips: [
+                           {value: 100},
+                           {value: 100},
+                           {value: 500},
+                           {value: 500},
+                           {value: 2000},
+                         ]
+                       })}.to_not raise_error
+
+
+    expect{Player.call({
+                         hand: [
+                           {suit: :spades, value: 10},
+                           {suit: :spades, value: 14},
+                           {suit: :hearts, value: 8},
+                           {value: 9},
+                           {value: "A"}
+                         ],
+                         chips: [
+                           {value: 100},
+                           {value: 100},
+                           {value: 500},
+                           {value: 500},
+                           {value: nil},
+                         ]
+                       })}.to raise_error
+  end
+
   it "#define_builder returns result, if raise: false" do
     Entity = EntityUtils.define_builder([:name, :string, :mandatory])
 
