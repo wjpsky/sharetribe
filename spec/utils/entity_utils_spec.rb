@@ -86,7 +86,8 @@ describe EntityUtils do
     )
 
     entity = EntityUtils.define_builder(
-      [:name, :mandatory, entity: name_details_entity]
+      [:name, :mandatory, entity: name_details_entity],
+      [:additional_name, :optional, entity: name_details_entity]
     )
 
     # Validators
@@ -126,7 +127,8 @@ describe EntityUtils do
     )
 
     entity = EntityUtils.define_builder(
-      [:name, :mandatory, collection: name_details_entity])
+      [:name, :mandatory, collection: name_details_entity],
+      [:additional_name, :optional, collection: name_details_entity])
 
     # Validators
     expect{entity.call({name: [{type: :first, value: 'First'}, {type: :last, value: 'Last'}]})}

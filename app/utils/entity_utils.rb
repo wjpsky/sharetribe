@@ -220,7 +220,7 @@ module EntityUtils
             collection_errors = validate_all(spec[:collection], v, "#{name.to_s}[#{i}]")
             errors.concat(collection_errors)
           }
-        elsif spec[:entity].present?
+        elsif spec[:entity].present? && input[name].present?
           validate_all(spec[:entity], input[name], name.to_s)
         else
           []
@@ -242,8 +242,8 @@ module EntityUtils
 
       out[name] =
         if spec[:collection].present?
-          out[name].map { |v| transform_all(spec[:collection], v) }
-        elsif spec[:entity].present?
+          (out[name] || []).map { |v| transform_all(spec[:collection], v) }
+        elsif spec[:entity].present? && out[name].present?
           transform_all(spec[:entity], out[name])
         else
           out[name]
